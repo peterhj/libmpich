@@ -14,6 +14,9 @@ fn main() {
     .whitelist_recursively(false)
     .whitelist_type("MPI_Status")
     .whitelist_type("MPI_Request")
+    .whitelist_type("MPI_Offset")
+    .whitelist_type("MPI_Info")
+    .whitelist_var("MPI_SUCCESS")
     // Datatypes.
     .whitelist_type("MPI_Datatype")
     // Communicators.
@@ -23,12 +26,18 @@ fn main() {
     // RMA and windows.
     .whitelist_type("MPI_Win")
     // File and I/O.
-    //.whitelist_type("MPI_File")
+    .whitelist_type("ADIOI_FileD")
+    .whitelist_type("MPI_File")
+    .whitelist_type("ADIOI_RequestD")
+    .whitelist_type("MPIO_Request")
+    .whitelist_var("MPI_MODE_RDONLY")
     // Collective operations.
     .whitelist_type("MPI_Op")
     // Begin prototypes.
     .whitelist_function("MPI_Send")
     .whitelist_function("MPI_Recv")
+    .whitelist_function("MPI_Get_count")
+    .whitelist_function("MPI_Get_elements")
     .whitelist_function("MPI_Isend")
     .whitelist_function("MPI_Irecv")
     .whitelist_function("MPI_Wait")
@@ -51,6 +60,14 @@ fn main() {
     .whitelist_function("MPI_Ibcast")
     .whitelist_function("MPI_Ireduce")
     .whitelist_function("MPI_Iallreduce")
+    // MPI-IO function prototypes.
+    .whitelist_function("MPI_File_open")
+    .whitelist_function("MPI_File_close")
+    .whitelist_function("MPI_File_get_size")
+    .whitelist_function("MPI_File_read_at")
+    .whitelist_function("MPI_File_iread_at")
+    .whitelist_function("MPIO_Test")
+    .whitelist_function("MPIO_Wait")
     .generate()
     .expect("bindgen failed to generate mpi bindings");
   fs::remove_file(out_dir.join("mpi_bind.rs")).ok();

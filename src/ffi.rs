@@ -2,7 +2,7 @@
 #![allow(non_upper_case_globals)]
 #![allow(non_snake_case)]
 
-use std::os::raw::{c_int, c_char};
+use std::os::raw::{c_int};
 
 // FIXME: bindgen doesnt support "mpi.h" macro defines,
 // so we have to manually write bindings for constants.
@@ -25,3 +25,6 @@ pub const MPI_MAX:    MPI_Op = 0x58000001;
 pub const MPI_MIN:    MPI_Op = 0x58000002;
 pub const MPI_SUM:    MPI_Op = 0x58000003;
 pub const MPI_PROD:   MPI_Op = 0x58000004;
+
+pub const MPI_INFO_NULL:  MPI_Info = 0x1c000000;
+pub const MPI_INFO_ENV:   MPI_Info = 0x5c000001;
