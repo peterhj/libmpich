@@ -21,6 +21,8 @@ fn main() {
     .whitelist_type("MPI_Datatype")
     // Communicators.
     .whitelist_type("MPI_Comm")
+    .whitelist_function("MPI_Comm_create")
+    .whitelist_function("MPI_Comm_disconnect")
     // Groups.
     .whitelist_type("MPI_Group")
     // RMA and windows.

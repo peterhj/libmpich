@@ -16,6 +16,16 @@ pub struct MPIComm {
   owned:    bool,
 }
 
+impl Drop for MPIComm {
+  fn drop(&mut self) {
+    if self.owned {
+      let status = unsafe { MPI_Comm_disconnect(&mut self.raw as *mut _) };
+      assert_eq!(status, MPI_SUCCESS as _);
+      assert_eq!(self.raw, MPI_COMM_NULL);
+    }
+  }
+}
+
 impl MPIComm {
   pub fn world() -> Self {
     MPIComm{
@@ -45,7 +55,7 @@ impl Drop for MPIFile {
 }
 
 impl MPIFile {
-  pub fn open<P>(path: P, comm: &MPIComm) -> MPIResult<MPIFile> where P: AsRef<Path> {
+  pub fn open<P>(path: P, comm: &mut MPIComm) -> MPIResult<MPIFile> where P: AsRef<Path> {
     let path_cstr = CString::new(path.as_ref().as_os_str().as_bytes()).unwrap();
     let mut raw: MPI_File = null_mut();
     let status = unsafe { MPI_File_open(
@@ -59,6 +69,9 @@ impl MPIFile {
       MPI_SUCCESS => Ok(MPIFile{raw: raw}),
       _ => Err(status),
     }
+  }
+
+  pub fn close(self) {
   }
 
   pub fn read_at(&mut self, offset: i64, buf: &mut [u8]) -> MPIResult<usize> {

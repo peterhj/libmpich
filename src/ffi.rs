@@ -18,6 +18,7 @@ pub const MPI_BYTE:   MPI_Datatype = 0x4c00010d;
 pub const MPI_FLOAT:  MPI_Datatype = 0x4c00040a;
 pub const MPI_DOUBLE: MPI_Datatype = 0x4c00080b;
 
+pub const MPI_COMM_NULL:  MPI_Comm = 0x04000000;
 pub const MPI_COMM_WORLD: MPI_Comm = 0x44000000;
 pub const MPI_COMM_SELF:  MPI_Comm = 0x44000001;
 
