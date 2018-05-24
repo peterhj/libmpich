@@ -2,14 +2,28 @@ use ::ffi::*;
 
 use std::ffi::{CString};
 use std::mem::{zeroed};
+use std::os::raw::{c_void};
 use std::os::unix::ffi::{OsStrExt};
 use std::path::{Path};
 use std::ptr::{null_mut};
 
 pub mod ffi;
 
-// TODO
+fn sz2int(sz: usize) -> i32 {
+  assert!(sz <= i32::max_value() as _);
+  sz as _
+}
+
+// TODO: dedicated error type.
 pub type MPIResult<T> = Result<T, i32>;
+
+pub fn mpi_init_multithreaded() -> Result<()> {
+  let res = unsafe { MPI_Init_thread(MPI_THREAD_SERIALIZED) };
+  match res as u32 {
+    MPI_SUCCESS => Ok(()),
+    e => Err(e),
+  }
+}
 
 pub struct MPIComm {
   raw:      MPI_Comm,
@@ -39,6 +53,91 @@ impl MPIComm {
       raw:      MPI_COMM_SELF,
       owned:    false,
     }
+  }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum MPIReduceOp {
+  Max,
+  Min,
+  Sum,
+  Prod,
+}
+
+impl MPIReduceOp {
+  pub fn to_raw_op(&self) -> MPI_Op {
+    match *self {
+      MPIReduceOp::Max => MPI_MAX,
+      MPIReduceOp::Min => MPI_MIN,
+      MPIReduceOp::Sum => MPI_SUM,
+      MPIReduceOp::Prod => MPI_PROD,
+    }
+  }
+}
+
+pub trait MPIDataTypeExt: Copy {
+  fn mpi_data_type() -> MPI_Datatype;
+}
+
+impl MPIDataTypeExt for u8  { fn mpi_data_type() -> MPI_Datatype { MPI_BYTE } }
+impl MPIDataTypeExt for f32 { fn mpi_data_type() -> MPI_Datatype { MPI_FLOAT } }
+impl MPIDataTypeExt for f64 { fn mpi_data_type() -> MPI_Datatype { MPI_DOUBLE } }
+
+pub fn mpi_barrier(comm: &mut MPIComm) -> MPIResult<()> {
+  let res = unsafe { MPI_Barrier(comm.raw) };
+  match res as u32 {
+    MPI_SUCCESS => Ok(()),
+    e => Err(e),
+  }
+}
+
+pub unsafe fn mpi_bcast<T: MPIDataTypeExt>(buf: *mut T, len: usize, root: i32, comm: &mut MPIComm) -> MPIResult<()> {
+  let count = sz2int(len);
+  let res = unsafe { MPI_Bcast(
+      buf as *mut c_void,
+      count,
+      T::mpi_data_type(),
+      root,
+      comm.raw,
+  ) };
+  match res {
+    MPI_SUCCESS => Ok(()),
+    e => Err(e),
+  }
+}
+
+pub unsafe fn mpi_reduce<T: MPIDataTypeExt>(src: *const T, src_len: usize, dst: *mut T, dst_len: usize, op: MPIReduceOp, root: i32, comm: &mut MPIComm) -> MPIResult<()> {
+  assert_eq!(src_len, dst_len);
+  let count = sz2int(src_len);
+  let res = unsafe { MPI_Reduce(
+      src as *const c_void,
+      dst as *mut c_void,
+      count,
+      T::mpi_data_type(),
+      op.to_raw_op(),
+      root,
+      comm.raw,
+  ) };
+  match res {
+    MPI_SUCCESS => Ok(()),
+    e => Err(e),
+  }
+}
+
+pub unsafe fn mpi_allreduce<T: MPIDataTypeExt>(src: *const T, src_len: usize, dst: *mut T, dst_len: usize, op: MPIReduceOp, comm: &mut MPIComm) -> MPIResult<()> {
+  assert_eq!(src_len, dst_len);
+  let count = sz2int(src_len);
+  let res = unsafe { MPI_Allreduce(
+      src as *const c_void,
+      dst as *mut c_void,
+      count,
+      T::mpi_data_type(),
+      op.to_raw_op(),
+      comm.raw,
+  ) };
+  match res {
+    MPI_SUCCESS => Ok(()),
+    e => Err(e),
   }
 }
 
