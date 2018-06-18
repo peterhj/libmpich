@@ -12,6 +12,7 @@ fn main() {
   let mpi_bindings = bindgen::Builder::default()
     .header("wrapped.h")
     .whitelist_recursively(false)
+    .whitelist_type("MPI_Aint")
     .whitelist_type("MPI_Status")
     .whitelist_type("MPI_Request")
     .whitelist_type("MPI_Offset")
@@ -29,6 +30,14 @@ fn main() {
     .whitelist_type("MPI_Group")
     // RMA and windows.
     .whitelist_type("MPI_Win")
+    .whitelist_function("MPI_Win_create")
+    .whitelist_function("MPI_Win_lock")
+    .whitelist_function("MPI_Win_unlock")
+    .whitelist_function("MPI_Get")
+    .whitelist_function("MPI_Alloc_mem")
+    .whitelist_function("MPI_Free_mem")
+    .whitelist_var("MPI_LOCK_SHARED")
+    .whitelist_var("MPI_LOCK_EXCLUSIVE")
     // File and I/O.
     .whitelist_type("ADIOI_FileD")
     .whitelist_type("MPI_File")
