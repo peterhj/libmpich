@@ -1,5 +1,6 @@
 use ::ffi::*;
 
+use std::env;
 use std::ffi::{CString};
 use std::mem::{zeroed};
 use std::os::raw::{c_void};
@@ -15,10 +16,41 @@ fn sz2int(sz: usize) -> i32 {
 }
 
 // TODO: dedicated error type.
-pub type MPIResult<T> = Result<T, i32>;
+pub type MPIResult<T> = Result<T, u32>;
 
-pub fn mpi_init_multithreaded() -> Result<()> {
-  let res = unsafe { MPI_Init_thread(MPI_THREAD_SERIALIZED) };
+pub fn mpi_init_multithreaded() -> MPIResult<()> {
+  let args: Vec<_> = env::args().collect();
+  let mut raw_args = vec![];
+  for arg in args.iter() {
+    let raw_arg = CString::new(arg.clone()).unwrap();
+    raw_args.push(raw_arg);
+  }
+  let mut provided: i32 = -1;
+  let res = {
+    let mut argc: i32 = args.len() as _;
+    let mut argv_buf: Vec<*mut i8> = vec![];
+    for raw_arg in raw_args.iter() {
+      argv_buf.push(raw_arg.as_ptr() as *mut _);
+    }
+    let mut argv = argv_buf.as_mut_ptr();
+    unsafe { MPI_Init_thread(
+        &mut argc as *mut _,
+        &mut argv as *mut *mut *mut _,
+        MPI_THREAD_SERIALIZED as _,
+        &mut provided as *mut _,
+    ) }
+  };
+  match res as u32 {
+    MPI_SUCCESS => {
+      assert_eq!(provided, MPI_THREAD_SERIALIZED as _);
+      Ok(())
+    }
+    e => Err(e),
+  }
+}
+
+pub fn mpi_finalize() -> MPIResult<()> {
+  let res = unsafe { MPI_Finalize() };
   match res as u32 {
     MPI_SUCCESS => Ok(()),
     e => Err(e),
@@ -53,6 +85,20 @@ impl MPIComm {
       raw:      MPI_COMM_SELF,
       owned:    false,
     }
+  }
+
+  pub fn rank(&self) -> i32 {
+    let mut rank: i32 = 0;
+    let status = unsafe { MPI_Comm_rank(self.raw, &mut rank as *mut _) };
+    assert_eq!(status, MPI_SUCCESS as _);
+    rank
+  }
+
+  pub fn num_ranks(&self) -> i32 {
+    let mut nranks: i32 = 0;
+    let status = unsafe { MPI_Comm_size(self.raw, &mut nranks as *mut _) };
+    assert_eq!(status, MPI_SUCCESS as _);
+    nranks
   }
 }
 
@@ -100,7 +146,7 @@ pub unsafe fn mpi_bcast<T: MPIDataTypeExt>(buf: *mut T, len: usize, root: i32, c
       root,
       comm.raw,
   ) };
-  match res {
+  match res as u32 {
     MPI_SUCCESS => Ok(()),
     e => Err(e),
   }
@@ -118,7 +164,7 @@ pub unsafe fn mpi_reduce<T: MPIDataTypeExt>(src: *const T, src_len: usize, dst: 
       root,
       comm.raw,
   ) };
-  match res {
+  match res as u32 {
     MPI_SUCCESS => Ok(()),
     e => Err(e),
   }
@@ -135,7 +181,7 @@ pub unsafe fn mpi_allreduce<T: MPIDataTypeExt>(src: *const T, src_len: usize, ds
       op.to_raw_op(),
       comm.raw,
   ) };
-  match res {
+  match res as u32 {
     MPI_SUCCESS => Ok(()),
     e => Err(e),
   }
@@ -166,7 +212,7 @@ impl MPIFile {
     ) };
     match status as u32 {
       MPI_SUCCESS => Ok(MPIFile{raw: raw}),
-      _ => Err(status),
+      e => Err(e),
     }
   }
 
@@ -200,10 +246,10 @@ impl MPIFile {
             assert!(recv_count <= count);
             Ok(recv_count as _)
           }
-          _ => Err(res2),
+          e2 => Err(e2),
         }
       }
-      _ => Err(res),
+      e => Err(e),
     }
   }
 }

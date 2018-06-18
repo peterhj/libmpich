@@ -23,6 +23,8 @@ fn main() {
     .whitelist_type("MPI_Comm")
     .whitelist_function("MPI_Comm_create")
     .whitelist_function("MPI_Comm_disconnect")
+    .whitelist_function("MPI_Comm_rank")
+    .whitelist_function("MPI_Comm_size")
     // Groups.
     .whitelist_type("MPI_Group")
     // RMA and windows.
