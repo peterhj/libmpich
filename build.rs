@@ -7,7 +7,7 @@ use std::path::{PathBuf};
 fn main() {
   let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
 
-  println!("cargo:rustc-link-lib=mpich");
+  //println!("cargo:rustc-link-lib=mpich");
 
   let mpi_bindings = bindgen::Builder::default()
     .header("wrapped.h")
@@ -31,6 +31,7 @@ fn main() {
     // RMA and windows.
     .whitelist_type("MPI_Win")
     .whitelist_function("MPI_Win_create")
+    .whitelist_function("MPI_Win_free")
     .whitelist_function("MPI_Win_lock")
     .whitelist_function("MPI_Win_unlock")
     .whitelist_function("MPI_Get")
