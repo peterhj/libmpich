@@ -197,36 +197,37 @@ impl MPIMem {
     }
   }
 
-  pub fn as_slice(&self) -> &[u8] {
+  /*pub fn as_slice(&self) -> &[u8] {
     unsafe { from_raw_parts(self.base as *const u8, self.size) }
   }
 
   pub fn as_mut_slice(&mut self) -> &mut [u8] {
     unsafe { from_raw_parts_mut(self.base as *mut u8, self.size) }
-  }
+  }*/
 }
 
-pub struct MPIWindowLockSharedGuard<'a, T: 'static> {
+pub struct MPIRMAWinLockSharedGuard<'a, T: 'static> {
   rank: i32,
-  win:  &'a MPIWindow<T>,
+  win:  &'a MPIRMAWin<T>,
 }
 
-impl<'a, T: 'static> Drop for MPIWindowLockSharedGuard<'a, T> {
+impl<'a, T: 'static> Drop for MPIRMAWinLockSharedGuard<'a, T> {
   fn drop(&mut self) {
     let res = unsafe { MPI_Win_unlock(self.rank, self.win.raw) };
     assert_eq!(res as u32, MPI_SUCCESS);
   }
 }
 
-impl<'a, T: MPIDataTypeExt + 'static> MPIWindowLockSharedGuard<'a, T> {
-  pub fn as_slice(&'a self) -> &'a [T] {
+impl<'a, T: MPIDataTypeExt + 'static> MPIRMAWinLockSharedGuard<'a, T> {
+  /*pub fn as_slice(&'a self) -> &'a [T] {
     unsafe { from_raw_parts(self.win.base, self.win.len) }
-  }
+  }*/
 
-  pub unsafe fn get_mem(&'a self, buf: *mut T, len: usize, tg_rank: i32, tg_offset: usize, tg_len: usize) -> MPIResult<()> {
+  pub fn get_mem(&'a self, buf: &mut [T], tg_rank: i32, tg_offset: usize, tg_len: usize) -> MPIResult<()> {
+    assert_eq!(buf.len(), tg_len);
     let res = unsafe { MPI_Get(
-        buf as *mut c_void,
-        sz2int(len),
+        buf.as_mut_ptr() as *mut c_void,
+        sz2int(buf.len()),
         T::mpi_data_type(),
         tg_rank,
         sz2longint(tg_offset),
@@ -241,20 +242,20 @@ impl<'a, T: MPIDataTypeExt + 'static> MPIWindowLockSharedGuard<'a, T> {
   }
 }
 
-pub struct MPIWindowLockExclGuard<'a, T: 'static> {
+pub struct MPIRMAWinLockExclGuard<'a, T: 'static> {
   rank: i32,
-  win:  &'a mut MPIWindow<T>,
+  win:  &'a MPIRMAWin<T>,
 }
 
-impl<'a, T: 'static> Drop for MPIWindowLockExclGuard<'a, T> {
+impl<'a, T: 'static> Drop for MPIRMAWinLockExclGuard<'a, T> {
   fn drop(&mut self) {
     let res = unsafe { MPI_Win_unlock(self.rank, self.win.raw) };
     assert_eq!(res as u32, MPI_SUCCESS);
   }
 }
 
-impl<'a, T: MPIDataTypeExt + 'static> MPIWindowLockExclGuard<'a, T> {
-  pub fn as_slice(&'a self) -> &'a [T] {
+impl<'a, T: MPIDataTypeExt + 'static> MPIRMAWinLockExclGuard<'a, T> {
+  /*pub fn as_slice(&'a self) -> &'a [T] {
     //u8s_to_typed(self.win.mem.as_slice(), self.win.len)
     unsafe { from_raw_parts(self.win.base, self.win.len) }
   }
@@ -262,10 +263,28 @@ impl<'a, T: MPIDataTypeExt + 'static> MPIWindowLockExclGuard<'a, T> {
   pub fn as_mut_slice(&'a mut self) -> &'a mut [T] {
     //u8s_to_typed_mut(self.win.mem.as_mut_slice(), self.win.len)
     unsafe { from_raw_parts_mut(self.win.base, self.win.len) }
+  }*/
+
+  pub fn put_mem(&'a self, buf: &[T], tg_rank: i32, tg_offset: usize, tg_len: usize) -> MPIResult<()> {
+    assert_eq!(buf.len(), tg_len);
+    let res = unsafe { MPI_Put(
+        buf.as_ptr() as *const c_void,
+        sz2int(buf.len()),
+        T::mpi_data_type(),
+        tg_rank,
+        sz2longint(tg_offset),
+        sz2int(tg_len),
+        T::mpi_data_type(),
+        self.win.raw,
+    ) };
+    match res as u32 {
+      MPI_SUCCESS => Ok(()),
+      e => Err(e),
+    }
   }
 }
 
-pub struct MPIWindow<T> {
+pub struct MPIRMAWin<T> {
   rank: i32,
   //mem:  MPIMem,
   base: *mut T,
@@ -275,14 +294,14 @@ pub struct MPIWindow<T> {
   _mrk: PhantomData<*mut T>,
 }
 
-impl<T> Drop for MPIWindow<T> {
+impl<T> Drop for MPIRMAWin<T> {
   fn drop(&mut self) {
     let res = unsafe { MPI_Win_free(&mut self.raw as *mut _) };
     assert_eq!(res as u32, MPI_SUCCESS);
   }
 }
 
-impl<T: MPIDataTypeExt> MPIWindow<T> {
+impl<T: MPIDataTypeExt> MPIRMAWin<T> {
   /*pub fn new(len: usize, comm: &mut MPIComm) -> MPIResult<Self> {
     let rank = comm.rank();
     let size = size_of::<T>() * len;
@@ -297,7 +316,7 @@ impl<T: MPIDataTypeExt> MPIWindow<T> {
         &mut raw_win as *mut _,
     ) };
     match res as u32 {
-      MPI_SUCCESS => Ok(MPIWindow{
+      MPI_SUCCESS => Ok(MPIRMAWin{
         rank:   rank,
         len:    len,
         mem:    mem,
@@ -322,7 +341,7 @@ impl<T: MPIDataTypeExt> MPIWindow<T> {
         &mut raw_win as *mut _,
     ) };
     match res as u32 {
-      MPI_SUCCESS => Ok(MPIWindow{
+      MPI_SUCCESS => Ok(MPIRMAWin{
         rank:   rank,
         //mem:    mem,
         base:   base,
@@ -335,7 +354,7 @@ impl<T: MPIDataTypeExt> MPIWindow<T> {
     }
   }
 
-  pub fn lock_shared(&self) -> MPIWindowLockSharedGuard<T> {
+  pub fn lock_shared(&self) -> MPIRMAWinLockSharedGuard<T> {
     let res = unsafe { MPI_Win_lock(
         MPI_LOCK_SHARED as _,
         self.rank,
@@ -343,13 +362,13 @@ impl<T: MPIDataTypeExt> MPIWindow<T> {
         self.raw,
     ) };
     assert_eq!(res as u32, MPI_SUCCESS);
-    MPIWindowLockSharedGuard{
+    MPIRMAWinLockSharedGuard{
       rank: self.rank,
       win:  self,
     }
   }
 
-  pub fn lock(&mut self) -> MPIWindowLockExclGuard<T> {
+  pub fn lock(&self) -> MPIRMAWinLockExclGuard<T> {
     let res = unsafe { MPI_Win_lock(
         MPI_LOCK_EXCLUSIVE as _,
         self.rank,
@@ -357,7 +376,7 @@ impl<T: MPIDataTypeExt> MPIWindow<T> {
         self.raw,
     ) };
     assert_eq!(res as u32, MPI_SUCCESS);
-    MPIWindowLockExclGuard{
+    MPIRMAWinLockExclGuard{
       rank: self.rank,
       win:  self,
     }
