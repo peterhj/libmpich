@@ -35,6 +35,7 @@ fn main() {
     .whitelist_function("MPI_Win_lock")
     .whitelist_function("MPI_Win_unlock")
     .whitelist_function("MPI_Get")
+    .whitelist_function("MPI_Put")
     .whitelist_function("MPI_Alloc_mem")
     .whitelist_function("MPI_Free_mem")
     .whitelist_var("MPI_LOCK_SHARED")

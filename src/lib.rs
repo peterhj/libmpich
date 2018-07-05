@@ -183,7 +183,7 @@ impl Drop for MPIMem {
 }
 
 impl MPIMem {
-  pub fn alloc(size: usize) -> Self {
+  pub unsafe fn alloc(size: usize) -> Self {
     let mut base: *mut c_void = null_mut();
     let res = unsafe { MPI_Alloc_mem(
         sz2longint(size),
@@ -195,6 +195,14 @@ impl MPIMem {
       base: base,
       size: size,
     }
+  }
+
+  pub unsafe fn as_mut_ptr(&self) -> *mut u8 {
+    self.base as *mut _
+  }
+
+  pub fn size_bytes(&self) -> usize {
+    self.size
   }
 
   /*pub fn as_slice(&self) -> &[u8] {
